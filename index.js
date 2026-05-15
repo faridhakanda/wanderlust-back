@@ -33,7 +33,7 @@ async function run() {
     try {
         const database = client.db('wanderlust');
         const allPlacesList = database.collection('places');
-        
+        const bookingCollection = database.collection('bookings');
         // for all places get and post method
         app.get('/destination', async(req, res) => {
             const places = await allPlacesList.find();
@@ -86,7 +86,28 @@ async function run() {
             res.send(result);
         })
 
-
+        // booking get, post and delete method api
+        app.get('/booking/:userId', async(req, res) => {
+            const { userId } = req.params;
+            const bookingData = await bookingCollection.find({ userId: userId });
+            const bookings = await bookingData.toArray();
+            res.send(bookings);
+        })
+        app.post('/booking', async(req, res) => {
+            const bookingData = req.body;
+            const result = await bookingCollection.insertOne(bookingData);
+            res.json(result);
+        })
+        app.delete('/booking/:id', async(req, res) => {
+            const { id } = req.params;
+            const query = {
+                _id: new ObjectId(id)
+            }
+            // there is two way to do delete
+            //const result  = await bookingCollection.deleteOne(query);
+            const result = await bookingCollection.deleteOne({ _id: new ObjectId(id) });
+            res.json(result);
+        })
 
         await client.connect();
         await client.db('places in wanderlust').command({ ping: 1});
