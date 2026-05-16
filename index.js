@@ -18,6 +18,7 @@ app.get('/', (req, res) => {
 // mongodb doc code 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { createRemoteJWKSet, jwtVerify } = require('jose-cjs')
 const uri = process.env.MONGODB_URI
 
 
@@ -28,6 +29,45 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+
+const JWKS = createRemoteJWKSet(
+    new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+)
+
+// verify token with jwt for authentication
+// middleware function
+const verifyToken = async (req, res, next) => {
+    //const token = req.headers.authorization
+    const authToken = req?.headers.authorization;
+    if (!authToken) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+    const token = authToken.split(" ")[1]
+    if (!token) {
+        //console.log('not get token!')
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+        const { payload } = await jwtVerify(token, JWKS)
+        console.log('payload: ', payload)
+        next()
+    } catch(err) {
+        // console.error('Token validation failed: ', error)
+        // throw error
+        return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    //console.log(token)
+    //console.log('Farid')
+    //console.log(authToken)
+    //console.log('only token: ')
+    //console.log(token)
+    //next()
+}
+
+
 
 async function run() {
     try {
@@ -40,14 +80,37 @@ async function run() {
             const destinations = await places.toArray();
             res.send(destinations);
         })
-        app.post('/destination', async(req, res) => {
+        app.post('/destination',verifyToken, async(req, res) => {
             const destinationData = req.body
             const result = await allPlacesList.insertOne(destinationData)
             res.json(result)
         })
         
         // now see a single place details, edit and delete
-        app.get('/destination/:id', async(req, res) => {
+        // here implement for authorization
+        // if user is logged in then he will 
+        // go the api otherwise not
+        // for this functionality here to be 
+        // add middleware
+        // app.get('/destination/:id', (req, res, next) => {
+        //     const header = req.headers.authorization
+        //     console.log(header.token)
+        //     // if (header === "logged in") {
+        //     //     next()
+        //     // } else {
+        //     //     res.status(401).json({message: "Unauthorized"})
+        //     // }
+        //     next()
+        // }, async(req, res) => {
+        //     const id = req.params; //.id;
+        //     const query = {
+        //         _id: new ObjectId(id)
+        //     }
+        //     const place = await allPlacesList.findOne(query);
+        //     res.send(place);
+        // })
+
+        app.get('/destination/:id',verifyToken, async(req, res) => {
             const id = req.params; //.id;
             const query = {
                 _id: new ObjectId(id)
@@ -55,7 +118,8 @@ async function run() {
             const place = await allPlacesList.findOne(query);
             res.send(place);
         })
-        app.patch('/destination/:id', async(req, res) => {
+
+        app.patch('/destination/:id', verifyToken, async(req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
@@ -77,7 +141,7 @@ async function run() {
             // const result = await allPlacesList.updateOne(query, editedDestination);
             res.send(result);
         })
-        app.delete('/destination/:id', async(req, res) => {
+        app.delete('/destination/:id', verifyToken, async(req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
@@ -87,18 +151,18 @@ async function run() {
         })
 
         // booking get, post and delete method api
-        app.get('/booking/:userId', async(req, res) => {
+        app.get('/booking/:userId', verifyToken, async(req, res) => {
             const { userId } = req.params;
             const bookingData = await bookingCollection.find({ userId: userId });
             const bookings = await bookingData.toArray();
             res.send(bookings);
         })
-        app.post('/booking', async(req, res) => {
+        app.post('/booking', verifyToken, async(req, res) => {
             const bookingData = req.body;
             const result = await bookingCollection.insertOne(bookingData);
             res.json(result);
         })
-        app.delete('/booking/:id', async(req, res) => {
+        app.delete('/booking/:id', verifyToken, async(req, res) => {
             const { id } = req.params;
             const query = {
                 _id: new ObjectId(id)
@@ -108,9 +172,9 @@ async function run() {
             const result = await bookingCollection.deleteOne({ _id: new ObjectId(id) });
             res.json(result);
         })
-
-        await client.connect();
-        await client.db('places in wanderlust').command({ ping: 1});
+        
+        // await client.connect();
+        // await client.db('places in wanderlust').command({ ping: 1});
         console.log('Pinged your deployment. Your successfully connected to MongoDB!');
     
     } finally {
