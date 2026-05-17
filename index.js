@@ -74,6 +74,12 @@ async function run() {
         const database = client.db('wanderlust');
         const allPlacesList = database.collection('places');
         const bookingCollection = database.collection('bookings');
+
+        // features destion in banner section
+        app.get('/features', async(req, res) => {
+            const result = await allPlacesList.find().limit(3).toArray()
+            res.send(result);
+        })
         // for all places get and post method
         app.get('/destination', async(req, res) => {
             const places = await allPlacesList.find();
